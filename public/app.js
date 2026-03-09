@@ -1,10 +1,12 @@
+const AUTO_REFRESH_MS = 20_000;
+
 const state = {
   tasks: [],
   holidays: {},
   holidayYear: null,
   syncVersion: 0,
   filter: "all",
-  selectedDateKey: toDateKey(new Date()),
+  selectedDateKey: null,
   monthCursor: firstDayOfMonth(new Date()),
   isBusy: false,
 };
@@ -56,11 +58,12 @@ elements.downloadIcs.addEventListener("click", () => {
 
 renderTodayInfo();
 refreshAll({ silent: false });
-setInterval(() => refreshAll({ silent: true }), 20000);
+setInterval(() => refreshAll({ silent: true }), AUTO_REFRESH_MS);
 
 async function onAiCreateTask(event) {
   event.preventDefault();
   const text = elements.aiText.value.trim();
+
   if (!text) {
     setStatus("请先输入一句任务描述。", true);
     return;
@@ -72,9 +75,13 @@ async function onAiCreateTask(event) {
       method: "POST",
       body: JSON.stringify({ text }),
     });
+    focusOnTaskDate(response?.task?.dueAt);
     elements.aiForm.reset();
     await refreshAll({ silent: false });
-    const dueText = response.task.dueAt ? formatDateTime(response.task.dueAt) : "无截止时间";
+
+    const dueText = response.task?.dueAt
+      ? formatDateTime(response.task.dueAt)
+      : "无截止时间";
     setStatus(`AI 已创建：${response.task.title}（${dueText}）`, false);
   } catch (error) {
     setStatus(`AI 创建失败：${error.message}`, true);
@@ -87,7 +94,9 @@ async function onManualCreateTask(event) {
   event.preventDefault();
   const title = elements.titleInput.value.trim();
   const notes = elements.notesInput.value.trim();
-  const dueAt = elements.dueInput.value ? new Date(elements.dueInput.value).toISOString() : null;
+  const dueAt = elements.dueInput.value
+    ? new Date(elements.dueInput.value).toISOString()
+    : null;
 
   if (!title) {
     setStatus("标题不能为空。", true);
@@ -96,7 +105,7 @@ async function onManualCreateTask(event) {
 
   try {
     setBusy(true);
-    await requestJson("/api/tasks", {
+    const response = await requestJson("/api/tasks", {
       method: "POST",
       body: JSON.stringify({
         title,
@@ -105,8 +114,10 @@ async function onManualCreateTask(event) {
         source: "web",
       }),
     });
+    focusOnTaskDate(response?.task?.dueAt || dueAt);
     elements.createForm.reset();
     await refreshAll({ silent: false });
+    setStatus(`已创建任务：${title}`, false);
   } catch (error) {
     setStatus(`创建失败：${error.message}`, true);
   } finally {
@@ -166,10 +177,10 @@ async function onMonthPick() {
   if (!value) {
     return;
   }
+
   const [yearText, monthText] = value.split("-");
   const year = Number(yearText);
   const month = Number(monthText);
-
   if (!year || !month) {
     return;
   }
@@ -225,7 +236,9 @@ function renderCalendar() {
     year: "numeric",
     month: "long",
   });
-  elements.monthPicker.value = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
+  elements.monthPicker.value = `${monthStart.getFullYear()}-${String(
+    monthStart.getMonth() + 1,
+  ).padStart(2, "0")}`;
 
   for (let index = 0; index < 42; index += 1) {
     const date = new Date(firstCellDate);
@@ -306,13 +319,17 @@ function renderTasks() {
   elements.taskList.innerHTML = "";
 
   let visibleTasks = state.tasks.filter((task) => {
-    if (state.filter === "all") return true;
+    if (state.filter === "all") {
+      return true;
+    }
     return task.status === state.filter;
   });
 
   if (state.selectedDateKey) {
     visibleTasks = visibleTasks.filter((task) => {
-      if (!task.dueAt) return false;
+      if (!task.dueAt) {
+        return false;
+      }
       return toDateKey(new Date(task.dueAt)) === state.selectedDateKey;
     });
   }
@@ -320,7 +337,9 @@ function renderTasks() {
   visibleTasks.sort((left, right) => {
     const leftDue = left.dueAt ? new Date(left.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
     const rightDue = right.dueAt ? new Date(right.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-    if (leftDue !== rightDue) return leftDue - rightDue;
+    if (leftDue !== rightDue) {
+      return leftDue - rightDue;
+    }
     return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
   });
 
@@ -335,7 +354,9 @@ function renderTasks() {
   for (const task of visibleTasks) {
     const item = document.createElement("li");
     item.className = "task-item";
-    if (task.status === "done") item.classList.add("done");
+    if (task.status === "done") {
+      item.classList.add("done");
+    }
 
     const main = document.createElement("div");
     main.className = "task-main";
@@ -346,7 +367,9 @@ function renderTasks() {
 
     const meta = document.createElement("p");
     meta.className = "task-meta";
-    meta.textContent = `截止：${task.dueAt ? formatDateTime(task.dueAt) : "无"} | 来源：${task.source}`;
+    meta.textContent = `截止：${
+      task.dueAt ? formatDateTime(task.dueAt) : "无"
+    } | 来源：${task.source}`;
     main.appendChild(meta);
 
     const actions = document.createElement("div");
@@ -356,7 +379,9 @@ function renderTasks() {
     toggleButton.type = "button";
     toggleButton.textContent = task.status === "done" ? "改为未完成" : "标记完成";
     toggleButton.addEventListener("click", () => {
-      updateTask(task.id, { status: task.status === "done" ? "todo" : "done" });
+      updateTask(task.id, {
+        status: task.status === "done" ? "todo" : "done",
+      });
     });
     actions.appendChild(toggleButton);
 
@@ -392,7 +417,9 @@ async function updateTask(taskId, payload) {
 
 async function deleteTask(taskId) {
   const confirmed = window.confirm("确认删除这个任务吗？");
-  if (!confirmed) return;
+  if (!confirmed) {
+    return;
+  }
 
   try {
     setBusy(true);
@@ -426,6 +453,20 @@ function updateSelectedDateText() {
     : "当前日期筛选：无";
 }
 
+function focusOnTaskDate(dueAt) {
+  if (!dueAt) {
+    return;
+  }
+
+  const dueDate = new Date(dueAt);
+  if (Number.isNaN(dueDate.getTime())) {
+    return;
+  }
+
+  state.selectedDateKey = toDateKey(dueDate);
+  state.monthCursor = firstDayOfMonth(dueDate);
+}
+
 function getTasksByDate(dateKey) {
   return state.tasks
     .filter((task) => task.dueAt && toDateKey(new Date(task.dueAt)) === dateKey)
@@ -449,7 +490,9 @@ function toDateKey(date) {
 
 function formatDateTime(value) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "无效时间";
+  if (Number.isNaN(date.getTime())) {
+    return "无效时间";
+  }
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 

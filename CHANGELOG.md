@@ -28,6 +28,9 @@ All notable changes to this project will be documented in this file.
 - Improved local start script resilience:
   - `start-local.ps1` no longer fails when browser auto-open is unavailable.
 - Updated README for public sharing readability and deployment guidance.
+- Fixed frontend visibility issue after task creation:
+  - New tasks now auto-focus to their due date in the list/calendar.
+  - Default task list no longer starts with a forced "today" date filter.
 - Project version bumped to `0.1.1`.
 
 ### Notes
