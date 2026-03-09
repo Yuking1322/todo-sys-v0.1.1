@@ -1,8 +1,8 @@
 {
   "name": "todo-openclaw-sync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "Web TODO MVP with OpenClaw sync endpoint",
+  "description": "Todo Sync Center v0.1.1 with OpenClaw, AI, PostgreSQL and Docker support",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",

@@ -1,129 +1,114 @@
-# 待办同步中心（MVP）
+# ✅ 待办同步中心（v0.1.1）
 
-本项目是本地优先的待办系统，支持：
-- 任务 CRUD
-- OpenClaw 同步入口
-- AI 自动建待办
-- 中文月历（高亮今天、节假日/周末/调休区分）
-- 日历导出 `.ics`
-- 存储后端可选：`json` 或 `postgres`
+一个本地优先的待办系统，支持 OpenClaw 同步、AI 建任务、中文月历和 Docker 部署。
 
-## CI 验证
+## ✨ 功能总览
 
-仓库包含 GitHub Actions：
-- `node-smoke`：Node 语法检查 + JSON 后端 API 烟测
-- `docker-smoke`：Docker Compose 构建 + 健康检查 + API 烟测
+- 🗂️ 任务 CRUD（新增/编辑/完成/删除）
+- 🔄 OpenClaw 同步入口
+- 🤖 AI 自动建待办（支持中文自然语义）
+- 📅 中文月历（高亮今天、节假日/周末/调休区分）
+- 📤 `.ics` 日历导出
+- 🧠 存储后端可切换：`json` / `postgres`
 
-## 本地启动（JSON）
+## 🚀 快速开始（本地 JSON）
 
-1. 安装依赖：
+1. 安装依赖
 
 ```powershell
 npm install
 ```
 
-2. 复制环境变量模板：
+2. 复制环境变量
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-3. 使用 JSON 存储（默认已是 JSON）：
+3. 确认 `.env` 使用 JSON（默认就是）
 
 ```powershell
-# .env
 DATA_BACKEND=json
 ```
 
-4. 启动服务：
+4. 启动服务
 
 ```powershell
 npm start
 ```
 
-5. 打开：
+5. 打开页面
 
 ```text
 http://127.0.0.1:5173
 ```
 
-## Docker + Nginx（推荐部署）
+## 🐳 Docker + Nginx（推荐分享部署）
 
-1. 准备配置（可选）：
+1. 准备配置（可选）
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-确认 Docker Desktop / Docker Engine 已启动。
+2. 确认 Docker Desktop / Docker Engine 已启动
 
-2. 启动：
+3. 启动容器
 
 ```powershell
 docker compose up -d --build
 ```
 
-或：
+或
 
 ```powershell
 npm run docker:up
 ```
 
-3. 访问：
+4. 访问
 
 ```text
 http://127.0.0.1:5173
 ```
 
-4. 停止：
+5. 停止
 
 ```powershell
 docker compose down
 ```
 
-或：
+或
 
 ```powershell
 npm run docker:down
 ```
 
 说明：
-- `nginx` 对外暴露 `5173`，反向代理到 `app` 容器。
-- `app` 默认使用 PostgreSQL（`DATA_BACKEND=postgres`）。
-- `db` 默认映射宿主机 `127.0.0.1:5432`，便于本机脚本迁移数据。
+- `nginx` 对外暴露 `5173`，反向代理到 `app`
+- `app` 默认走 PostgreSQL（`DATA_BACKEND=postgres`）
+- `db` 默认映射 `127.0.0.1:5432`
 
-## JSON 迁移到 PostgreSQL
+## 🛠️ JSON 迁移到 PostgreSQL
 
-1. 初始化数据库结构：
+1. 初始化数据库
 
 ```powershell
 npm run db:init
 ```
 
-2. 迁移 `data/todos.json` 到 PostgreSQL：
+2. 迁移数据
 
 ```powershell
 npm run db:migrate:json-to-postgres
 ```
 
-如果目标库不为空：
+如果目标库非空：
 
 ```powershell
 npm run db:migrate:json-to-postgres -- --force
 ```
 
-## 一键脚本（本机）
-
-- `launch-web.bat`：一键启动并打开页面
-- `stop-web.bat`：一键停止服务
-
-如在无图形环境运行，可设置：
-
-```powershell
-$env:SKIP_OPEN_BROWSER=1
-```
-
-## API
+## 📜 API 列表
 
 - `GET /api/health`
 - `GET /api/tasks`
@@ -134,31 +119,36 @@ $env:SKIP_OPEN_BROWSER=1
 - `POST /api/ai/create-task`
 - `GET /api/tasks.ics`
 - `GET /api/day-notes?month=YYYY-MM`
-- `PUT /api/day-notes/:date`（`date = YYYY-MM-DD`）
+- `PUT /api/day-notes/:date`（`date=YYYY-MM-DD`）
 - `GET /api/holidays?year=YYYY`
 
-## 环境变量
+## ⚙️ 关键环境变量
 
-关键变量：
 - `DATA_BACKEND=json|postgres`
-- `DATABASE_URL`（可选，优先）
+- `DATABASE_URL`（优先）
 - 或 `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`
 - `OPENCLAW_SYNC_TOKEN`
 - `AI_API_BASE` / `AI_API_KEY` / `AI_MODEL`
 
-## 节假日说明
+## 🧪 CI 验证
 
-节假日数据优先使用在线接口：
-- `HOLIDAY_YEAR_API`（默认 `timor`）
-- `HOLIDAY_FALLBACK_API`
+仓库已包含 GitHub Actions：
+- `node-smoke`：语法检查 + JSON API 烟测
+- `docker-smoke`：Docker 构建 + 健康检查 + API 烟测
 
-如果在线接口不可用，会启用内置兜底节日（元旦/劳动节/国庆）并继续显示周末颜色。
+## 🔐 安全说明
 
-## AI 输入说明
+- 已提供 [SECURITY.md](./SECURITY.md)
+- 建议开启：`Dependabot alerts`、`Code scanning default setup`
+- 不要提交 `.env`、密钥、真实业务数据
 
-`POST /api/ai/create-task` 支持：
-- 明确日期时间：`2026-03-10 18:30`
-- 相对日期：`today/tomorrow/day after tomorrow`、`今天/明天/后天`
-- 完成态关键词：`done/completed/完成`
+## 🧰 本地脚本
 
-如配置 `AI_API_BASE`、`AI_API_KEY`、`AI_MODEL`，会优先调用外部模型解析。
+- `launch-web.bat`：一键启动并打开页面
+- `stop-web.bat`：一键停止服务
+
+无图形环境可设置：
+
+```powershell
+$env:SKIP_OPEN_BROWSER=1
+```
