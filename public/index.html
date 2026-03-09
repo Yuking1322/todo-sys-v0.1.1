@@ -36,6 +36,20 @@
               </div>
             </div>
 
+            <div class="write-token-box">
+              <label for="write-token-input">写入令牌（可选）</label>
+              <div class="token-inline">
+                <input
+                  id="write-token-input"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="部署启用 APP_WRITE_TOKEN 时填写"
+                />
+                <button id="save-token-button" type="button">保存</button>
+                <button id="clear-token-button" type="button">清除</button>
+              </div>
+            </div>
+
             <form id="ai-form" class="stack-form">
               <label for="ai-text">AI 自动录入</label>
               <textarea

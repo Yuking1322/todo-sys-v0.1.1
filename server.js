@@ -10,6 +10,7 @@ loadDotEnv(path.join(__dirname, ".env"));
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || "5173");
 const OPENCLAW_SYNC_TOKEN = process.env.OPENCLAW_SYNC_TOKEN || "";
+const APP_WRITE_TOKEN = process.env.APP_WRITE_TOKEN || "";
 const AI_API_BASE = process.env.AI_API_BASE || "";
 const AI_API_KEY = process.env.AI_API_KEY || "";
 const AI_MODEL = process.env.AI_MODEL || "";
@@ -20,8 +21,13 @@ const HOLIDAY_FALLBACK_API =
 const HOLIDAY_FETCH_TIMEOUT_MS = Number(process.env.HOLIDAY_FETCH_TIMEOUT_MS || "8000");
 const MAX_BODY_SIZE = 1_000_000;
 
-const DATA_DIR = path.join(__dirname, "data");
-const DATA_FILE = path.join(DATA_DIR, "todos.json");
+const ENV_DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : "";
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : ENV_DATA_FILE
+    ? path.dirname(ENV_DATA_FILE)
+    : path.join(__dirname, "data");
+const DATA_FILE = ENV_DATA_FILE || path.join(DATA_DIR, "todos.json");
 const DATA_BACKEND = (process.env.DATA_BACKEND || "json").toLowerCase();
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -48,16 +54,19 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/tasks" && request.method === "POST") {
+      assertWriteAuthorized(request);
       const payload = await parseJsonBody(request);
       return handleCreateTask(payload, response);
     }
 
     if (pathname.startsWith("/api/tasks/") && request.method === "PATCH") {
+      assertWriteAuthorized(request);
       const payload = await parseJsonBody(request);
       return handleUpdateTask(pathname.slice("/api/tasks/".length), payload, response);
     }
 
     if (pathname.startsWith("/api/tasks/") && request.method === "DELETE") {
+      assertWriteAuthorized(request);
       return handleDeleteTask(pathname.slice("/api/tasks/".length), response);
     }
 
@@ -74,6 +83,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname.startsWith("/api/day-notes/") && request.method === "PUT") {
+      assertWriteAuthorized(request);
       const payload = await parseJsonBody(request);
       const dateKey = normalizeDateKey(pathname.slice("/api/day-notes/".length));
       return handleUpsertDayNote(dateKey, payload, response);
@@ -85,6 +95,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/ai/create-task" && request.method === "POST") {
+      assertWriteAuthorized(request);
       const payload = await parseJsonBody(request);
       return handleAiCreateTask(payload, response);
     }
@@ -116,6 +127,8 @@ async function bootstrap() {
 async function handleGetTasks(requestUrl, response) {
   const includeDeleted = requestUrl.searchParams.get("includeDeleted") === "true";
   const status = requestUrl.searchParams.get("status");
+  const dateFilterRaw = requestUrl.searchParams.get("date");
+  const dateFilter = dateFilterRaw ? normalizeDateKey(dateFilterRaw) : null;
   const sinceVersionRaw = Number(requestUrl.searchParams.get("sinceVersion") || "0");
   const sinceVersion = Number.isFinite(sinceVersionRaw) && sinceVersionRaw > 0 ? sinceVersionRaw : 0;
 
@@ -124,6 +137,19 @@ async function handleGetTasks(requestUrl, response) {
     status,
     sinceVersion,
   });
+
+  if (dateFilter) {
+    result.tasks = result.tasks.filter((task) => {
+      if (!task.dueAt) {
+        return false;
+      }
+      const dueDate = new Date(task.dueAt);
+      if (Number.isNaN(dueDate.getTime())) {
+        return false;
+      }
+      return toDateKeyLocal(dueDate) === dateFilter;
+    });
+  }
 
   return writeJson(response, 200, result);
 }
@@ -167,6 +193,9 @@ async function handleOpenClawSync(payload, request, response) {
     if (!token || token !== OPENCLAW_SYNC_TOKEN) {
       throw createError(403, "Forbidden");
     }
+  } else {
+    // When dedicated OpenClaw token is absent, fallback to generic write token policy.
+    assertWriteAuthorized(request);
   }
 
   const input = normalizeTaskInput(payload, { requireTitle: true, allowStatus: true });
@@ -825,6 +854,13 @@ function formatIcsDate(date) {
   return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
 }
 
+function toDateKeyLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function escapeIcs(text) {
   return String(text || "")
     .replace(/\\/g, "\\\\")
@@ -837,6 +873,41 @@ function createError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function assertWriteAuthorized(request) {
+  if (!APP_WRITE_TOKEN) {
+    return;
+  }
+
+  const token = extractAppWriteToken(request);
+  if (token !== APP_WRITE_TOKEN) {
+    throw createError(401, "Unauthorized");
+  }
+}
+
+function extractAppWriteToken(request) {
+  const headerToken = request.headers["x-app-token"];
+  if (Array.isArray(headerToken) && headerToken[0]) {
+    return String(headerToken[0]).trim();
+  }
+  if (typeof headerToken === "string" && headerToken.trim()) {
+    return headerToken.trim();
+  }
+
+  const authHeader = request.headers.authorization;
+  if (Array.isArray(authHeader) && authHeader[0]) {
+    return extractBearerToken(authHeader[0]);
+  }
+  if (typeof authHeader === "string") {
+    return extractBearerToken(authHeader);
+  }
+  return "";
+}
+
+function extractBearerToken(value) {
+  const match = String(value).match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
 }
 
 function writeJson(response, statusCode, payload) {

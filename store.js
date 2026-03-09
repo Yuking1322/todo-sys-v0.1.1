@@ -13,6 +13,7 @@ function createStore(options = {}) {
 function createJsonStore(options) {
   const dataDir = options.dataDir;
   const dataFile = options.dataFile;
+  const runSerialized = createAsyncQueue();
 
   if (!dataDir || !dataFile) {
     throw new Error("JSON store requires dataDir and dataFile");
@@ -21,168 +22,198 @@ function createJsonStore(options) {
   return {
     backend: "json",
     async init() {
-      ensureDataFile(dataDir, dataFile);
+      return runSerialized(async () => {
+        ensureDataFile(dataDir, dataFile);
+      });
     },
     async close() {},
     async getTasks(query) {
-      const store = readJsonStore(dataFile);
-      let tasks = [...store.tasks];
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        let tasks = [...store.tasks];
 
-      if (query.sinceVersion > 0) {
-        tasks = tasks.filter((task) => Number(task.version) > query.sinceVersion);
-      }
-      if (!query.includeDeleted) {
-        tasks = tasks.filter((task) => !task.deletedAt);
-      }
-      if (query.status === "todo" || query.status === "done") {
-        tasks = tasks.filter((task) => task.status === query.status);
-      }
+        if (query.sinceVersion > 0) {
+          tasks = tasks.filter((task) => Number(task.version) > query.sinceVersion);
+        }
+        if (!query.includeDeleted) {
+          tasks = tasks.filter((task) => !task.deletedAt);
+        }
+        if (query.status === "todo" || query.status === "done") {
+          tasks = tasks.filter((task) => task.status === query.status);
+        }
 
-      tasks.sort((left, right) => {
-        return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        tasks.sort((left, right) => {
+          return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        });
+
+        return {
+          tasks,
+          syncVersion: Number(store.syncVersion),
+        };
       });
-
-      return {
-        tasks,
-        syncVersion: Number(store.syncVersion),
-      };
     },
     async createTask(input) {
-      const store = readJsonStore(dataFile);
-      const task = createTaskRecord(input);
-      task.version = incrementJsonVersion(store);
-      store.tasks.push(task);
-      writeJsonStore(dataFile, store);
-
-      return {
-        task,
-        syncVersion: Number(store.syncVersion),
-      };
-    },
-    async updateTask(taskId, patch) {
-      const store = readJsonStore(dataFile);
-      const task = store.tasks.find((entry) => entry.id === taskId && !entry.deletedAt);
-      if (!task) {
-        return null;
-      }
-
-      if (patch.title !== undefined) {
-        task.title = patch.title;
-      }
-      if (patch.notes !== undefined) {
-        task.notes = patch.notes;
-      }
-      if (patch.dueAt !== undefined) {
-        task.dueAt = patch.dueAt;
-      }
-      if (patch.status !== undefined) {
-        task.status = patch.status;
-      }
-      if (patch.source !== undefined) {
-        task.source = patch.source;
-      }
-
-      task.updatedAt = new Date().toISOString();
-      task.version = incrementJsonVersion(store);
-      writeJsonStore(dataFile, store);
-
-      return {
-        task,
-        syncVersion: Number(store.syncVersion),
-      };
-    },
-    async deleteTask(taskId) {
-      const store = readJsonStore(dataFile);
-      const task = store.tasks.find((entry) => entry.id === taskId && !entry.deletedAt);
-      if (!task) {
-        return null;
-      }
-
-      const now = new Date().toISOString();
-      task.deletedAt = now;
-      task.updatedAt = now;
-      task.version = incrementJsonVersion(store);
-      writeJsonStore(dataFile, store);
-
-      return {
-        task,
-        syncVersion: Number(store.syncVersion),
-      };
-    },
-    async upsertOpenClawTask(input) {
-      const store = readJsonStore(dataFile);
-      let task = store.tasks.find((entry) => entry.externalId === input.externalId);
-      let mode = "updated";
-
-      if (!task) {
-        task = createTaskRecord({
-          title: input.title,
-          notes: input.notes,
-          dueAt: input.dueAt,
-          status: input.status || "todo",
-          source: "openclaw",
-          externalId: input.externalId,
-        });
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        const task = createTaskRecord(input);
         task.version = incrementJsonVersion(store);
         store.tasks.push(task);
-        mode = "created";
-      } else {
-        task.title = input.title;
-        task.notes = input.notes || "";
-        task.dueAt = input.dueAt || null;
-        task.source = "openclaw";
-        task.deletedAt = null;
-        if (input.status) {
-          task.status = input.status;
+        writeJsonStore(dataFile, store);
+
+        return {
+          task,
+          syncVersion: Number(store.syncVersion),
+        };
+      });
+    },
+    async updateTask(taskId, patch) {
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        const task = store.tasks.find((entry) => entry.id === taskId && !entry.deletedAt);
+        if (!task) {
+          return null;
         }
+
+        if (patch.title !== undefined) {
+          task.title = patch.title;
+        }
+        if (patch.notes !== undefined) {
+          task.notes = patch.notes;
+        }
+        if (patch.dueAt !== undefined) {
+          task.dueAt = patch.dueAt;
+        }
+        if (patch.status !== undefined) {
+          task.status = patch.status;
+        }
+        if (patch.source !== undefined) {
+          task.source = patch.source;
+        }
+
         task.updatedAt = new Date().toISOString();
         task.version = incrementJsonVersion(store);
-      }
+        writeJsonStore(dataFile, store);
 
-      writeJsonStore(dataFile, store);
-      return {
-        mode,
-        task,
-        syncVersion: Number(store.syncVersion),
-      };
+        return {
+          task,
+          syncVersion: Number(store.syncVersion),
+        };
+      });
+    },
+    async deleteTask(taskId) {
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        const task = store.tasks.find((entry) => entry.id === taskId && !entry.deletedAt);
+        if (!task) {
+          return null;
+        }
+
+        const now = new Date().toISOString();
+        task.deletedAt = now;
+        task.updatedAt = now;
+        task.version = incrementJsonVersion(store);
+        writeJsonStore(dataFile, store);
+
+        return {
+          task,
+          syncVersion: Number(store.syncVersion),
+        };
+      });
+    },
+    async upsertOpenClawTask(input) {
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        let task = store.tasks.find((entry) => entry.externalId === input.externalId);
+        let mode = "updated";
+
+        if (!task) {
+          task = createTaskRecord({
+            title: input.title,
+            notes: input.notes,
+            dueAt: input.dueAt,
+            status: input.status || "todo",
+            source: "openclaw",
+            externalId: input.externalId,
+          });
+          task.version = incrementJsonVersion(store);
+          store.tasks.push(task);
+          mode = "created";
+        } else {
+          task.title = input.title;
+          task.notes = input.notes || "";
+          task.dueAt = input.dueAt || null;
+          task.source = "openclaw";
+          task.deletedAt = null;
+          if (input.status) {
+            task.status = input.status;
+          }
+          task.updatedAt = new Date().toISOString();
+          task.version = incrementJsonVersion(store);
+        }
+
+        writeJsonStore(dataFile, store);
+        return {
+          mode,
+          task,
+          syncVersion: Number(store.syncVersion),
+        };
+      });
     },
     async getTasksForIcs() {
-      const store = readJsonStore(dataFile);
-      return store.tasks.filter((task) => !task.deletedAt && task.dueAt);
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        return store.tasks.filter((task) => !task.deletedAt && task.dueAt);
+      });
     },
     async getDayNotes(month) {
-      const store = readJsonStore(dataFile);
-      const notes = store.dayNotes || {};
-      if (!month) {
-        return notes;
-      }
-
-      const scopedNotes = {};
-      const prefix = `${month}-`;
-      for (const [dateKey, content] of Object.entries(notes)) {
-        if (dateKey.startsWith(prefix)) {
-          scopedNotes[dateKey] = content;
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        const notes = store.dayNotes || {};
+        if (!month) {
+          return notes;
         }
-      }
-      return scopedNotes;
+
+        const scopedNotes = {};
+        const prefix = `${month}-`;
+        for (const [dateKey, content] of Object.entries(notes)) {
+          if (dateKey.startsWith(prefix)) {
+            scopedNotes[dateKey] = content;
+          }
+        }
+        return scopedNotes;
+      });
     },
     async upsertDayNote(dateKey, content) {
-      const store = readJsonStore(dataFile);
-      if (content.trim()) {
-        store.dayNotes[dateKey] = content;
-      } else {
-        delete store.dayNotes[dateKey];
-      }
+      return runSerialized(async () => {
+        const store = readJsonStore(dataFile);
+        if (content.trim()) {
+          store.dayNotes[dateKey] = content;
+        } else {
+          delete store.dayNotes[dateKey];
+        }
 
-      incrementJsonVersion(store);
-      writeJsonStore(dataFile, store);
+        incrementJsonVersion(store);
+        writeJsonStore(dataFile, store);
 
-      return {
-        date: dateKey,
-        content: store.dayNotes[dateKey] || "",
-        syncVersion: Number(store.syncVersion),
-      };
+        return {
+          date: dateKey,
+          content: store.dayNotes[dateKey] || "",
+          syncVersion: Number(store.syncVersion),
+        };
+      });
     },
+  };
+}
+
+function createAsyncQueue() {
+  let tail = Promise.resolve();
+  return (operation) => {
+    const run = tail.then(
+      () => operation(),
+      () => operation(),
+    );
+    tail = run.catch(() => {});
+    return run;
   };
 }
 

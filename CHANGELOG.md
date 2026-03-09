@@ -31,6 +31,21 @@ All notable changes to this project will be documented in this file.
 - Fixed frontend visibility issue after task creation:
   - New tasks now auto-focus to their due date in the list/calendar.
   - Default task list no longer starts with a forced "today" date filter.
+- Added write-token authorization for mutating APIs:
+  - `APP_WRITE_TOKEN`
+  - `X-App-Token` request header
+- Added task date filter API:
+  - `GET /api/tasks?date=YYYY-MM-DD`
+- Improved JSON backend safety under concurrent requests:
+  - serialized operation queue for file-based store
+- Hardened Docker defaults:
+  - required `POSTGRES_PASSWORD` / `APP_WRITE_TOKEN` / `OPENCLAW_SYNC_TOKEN`
+  - removed default host exposure for PostgreSQL
+- Expanded automated tests:
+  - auth rejection
+  - AI create flow
+  - date filter flow
+  - task status lifecycle flow
 - Project version bumped to `0.1.1`.
 
 ### Notes

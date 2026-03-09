@@ -30,26 +30,15 @@ jobs:
           node --check scripts/init-db.js
           node --check scripts/migrate-json-to-postgres.js
 
-      - name: API Smoke Test (JSON backend)
-        run: |
-          node server.js &
-          SERVER_PID=$!
-          trap "kill $SERVER_PID" EXIT
-
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:5173/api/health >/dev/null; then
-              break
-            fi
-            sleep 1
-          done
-
-          curl -fsS http://127.0.0.1:5173/api/health
-          curl -fsS -X POST http://127.0.0.1:5173/api/tasks \
-            -H "Content-Type: application/json" \
-            -d '{"title":"ci-task"}'
+      - name: Run Integration Tests
+        run: npm test
 
   docker-smoke:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci_db_password
+      APP_WRITE_TOKEN: ci_write_token
+      OPENCLAW_SYNC_TOKEN: ci_openclaw_token
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,6 +62,7 @@ jobs:
       - name: Docker API Smoke
         run: |
           curl -fsS -X POST http://127.0.0.1:5173/api/tasks \
+            -H "X-App-Token: $APP_WRITE_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"title":"docker-ci-task"}'
 

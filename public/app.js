@@ -1,4 +1,5 @@
 const AUTO_REFRESH_MS = 20_000;
+const WRITE_TOKEN_STORAGE_KEY = "todo_write_token";
 
 const state = {
   tasks: [],
@@ -34,6 +35,9 @@ const elements = {
   summaryTodo: document.getElementById("summary-todo"),
   summaryDone: document.getElementById("summary-done"),
   todayLabel: document.getElementById("today-label"),
+  writeTokenInput: document.getElementById("write-token-input"),
+  saveTokenButton: document.getElementById("save-token-button"),
+  clearTokenButton: document.getElementById("clear-token-button"),
 };
 
 elements.aiForm.addEventListener("submit", onAiCreateTask);
@@ -55,7 +59,10 @@ elements.clearDateFilter.addEventListener("click", () => {
 elements.downloadIcs.addEventListener("click", () => {
   window.open("/api/tasks.ics", "_blank");
 });
+elements.saveTokenButton?.addEventListener("click", saveWriteToken);
+elements.clearTokenButton?.addEventListener("click", clearWriteToken);
 
+hydrateWriteToken();
 renderTodayInfo();
 refreshAll({ silent: false });
 setInterval(() => refreshAll({ silent: true }), AUTO_REFRESH_MS);
@@ -447,6 +454,49 @@ function setStatus(message, isError) {
   elements.statusText.className = isError ? "status error" : "status";
 }
 
+function hydrateWriteToken() {
+  if (!elements.writeTokenInput) {
+    return;
+  }
+
+  try {
+    const saved = localStorage.getItem(WRITE_TOKEN_STORAGE_KEY) || "";
+    elements.writeTokenInput.value = saved;
+  } catch {}
+}
+
+function getWriteToken() {
+  if (!elements.writeTokenInput) {
+    return "";
+  }
+  return elements.writeTokenInput.value.trim();
+}
+
+function saveWriteToken() {
+  const token = getWriteToken();
+  try {
+    if (token) {
+      localStorage.setItem(WRITE_TOKEN_STORAGE_KEY, token);
+      setStatus("写入令牌已保存。", false);
+    } else {
+      localStorage.removeItem(WRITE_TOKEN_STORAGE_KEY);
+      setStatus("写入令牌为空，已清除。", false);
+    }
+  } catch {
+    setStatus("写入令牌保存失败。", true);
+  }
+}
+
+function clearWriteToken() {
+  if (elements.writeTokenInput) {
+    elements.writeTokenInput.value = "";
+  }
+  try {
+    localStorage.removeItem(WRITE_TOKEN_STORAGE_KEY);
+  } catch {}
+  setStatus("写入令牌已清除。", false);
+}
+
 function updateSelectedDateText() {
   elements.selectedDateText.textContent = state.selectedDateKey
     ? `当前日期筛选：${state.selectedDateKey}`
@@ -497,12 +547,23 @@ function formatDateTime(value) {
 }
 
 async function requestJson(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    const token = getWriteToken();
+    if (token) {
+      headers["X-App-Token"] = token;
+    }
+  }
+
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    method,
+    headers,
   });
 
   let payload = {};

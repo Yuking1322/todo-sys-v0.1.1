@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js",
     "db:init": "node scripts/init-db.js",
     "db:migrate:json-to-postgres": "node scripts/migrate-json-to-postgres.js",
     "docker:up": "docker compose up -d --build",

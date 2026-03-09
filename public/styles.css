@@ -113,6 +113,22 @@ body {
   font-size: 18px;
 }
 
+.write-token-box {
+  display: grid;
+  gap: 6px;
+}
+
+.token-inline {
+  display: grid;
+  grid-template-columns: 1fr 64px 64px;
+  gap: 8px;
+  align-items: center;
+}
+
+.token-inline button {
+  padding: 9px 6px;
+}
+
 .stack-form,
 .create-form {
   display: grid;
@@ -478,6 +494,10 @@ button.danger {
   }
 
   .todo-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .token-inline {
     grid-template-columns: 1fr;
   }
 
