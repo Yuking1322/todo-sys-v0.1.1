@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>待办同步中心</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="card hero">
+        <h1>待办同步中心</h1>
+        <p>支持 OpenClaw 同步、AI 创建待办、节假日高亮月历。</p>
+      </header>
+
+      <section class="workspace">
+        <aside class="left-column">
+          <section class="card quick-card">
+            <div class="today-row">
+              <h2>今天</h2>
+              <p id="today-label" class="today-label">加载中...</p>
+            </div>
+
+            <div class="todo-overview">
+              <div class="overview-item">
+                <span class="label">总任务</span>
+                <strong id="summary-total">0</strong>
+              </div>
+              <div class="overview-item">
+                <span class="label">未完成</span>
+                <strong id="summary-todo">0</strong>
+              </div>
+              <div class="overview-item">
+                <span class="label">已完成</span>
+                <strong id="summary-done">0</strong>
+              </div>
+            </div>
+
+            <form id="ai-form" class="stack-form">
+              <label for="ai-text">AI 自动录入</label>
+              <textarea
+                id="ai-text"
+                rows="2"
+                placeholder="例如：明天 18:30 提交周报并发给小王"
+              ></textarea>
+              <button type="submit">AI 创建</button>
+            </form>
+
+            <form id="create-form" class="create-form">
+              <label>
+                标题
+                <input id="title-input" name="title" type="text" maxlength="120" required />
+              </label>
+              <label>
+                截止
+                <input id="due-input" name="dueAt" type="datetime-local" />
+              </label>
+              <label class="full-row">
+                备注
+                <textarea id="notes-input" name="notes" rows="2" maxlength="2000"></textarea>
+              </label>
+              <button type="submit">手动创建</button>
+            </form>
+          </section>
+
+          <section class="card task-panel">
+            <div class="list-toolbar">
+              <h2>待办列表</h2>
+              <div class="inline-actions">
+                <select id="filter-select">
+                  <option value="all">全部</option>
+                  <option value="todo">未完成</option>
+                  <option value="done">已完成</option>
+                </select>
+                <button id="refresh-button" type="button">刷新</button>
+              </div>
+            </div>
+            <p id="selected-date-text" class="calendar-tip">当前日期筛选：无</p>
+            <p id="status-text" class="status">正在加载...</p>
+            <ul id="task-list" class="task-list"></ul>
+          </section>
+        </aside>
+
+        <section class="card calendar-section">
+          <div class="calendar-toolbar">
+            <button id="month-prev" type="button" aria-label="上个月">上月</button>
+            <h2 id="month-label">2026年3月</h2>
+            <button id="month-next" type="button" aria-label="下个月">下月</button>
+            <input id="month-picker" type="month" />
+            <button id="clear-date-filter" type="button">清除日期筛选</button>
+            <button id="download-ics" type="button">导出日历(.ics)</button>
+          </div>
+
+          <div class="week-head">
+            <span>周日</span>
+            <span>周一</span>
+            <span>周二</span>
+            <span>周三</span>
+            <span>周四</span>
+            <span>周五</span>
+            <span>周六</span>
+          </div>
+
+          <div class="holiday-legend">
+            <span class="legend-item today">今天</span>
+            <span class="legend-item off">法定休假</span>
+            <span class="legend-item work">调休上班</span>
+            <span class="legend-item weekend">周末</span>
+          </div>
+
+          <div class="calendar-wrap">
+            <div id="calendar-grid" class="calendar-grid"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

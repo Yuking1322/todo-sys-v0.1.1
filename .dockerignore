@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log*
+yarn-error.log*
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.server.pid
+.run.log
+data/todos.json
+CODEX_PROGRESS.md

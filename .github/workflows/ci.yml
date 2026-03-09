@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  node-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Syntax Check
+        run: |
+          node --check server.js
+          node --check store.js
+          node --check scripts/init-db.js
+          node --check scripts/migrate-json-to-postgres.js
+
+      - name: API Smoke Test (JSON backend)
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          trap "kill $SERVER_PID" EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/api/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:5173/api/health
+          curl -fsS -X POST http://127.0.0.1:5173/api/tasks \
+            -H "Content-Type: application/json" \
+            -d '{"title":"ci-task"}'
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Compose Config Check
+        run: docker compose config
+
+      - name: Docker Compose Up
+        run: docker compose up -d --build
+
+      - name: Docker Health Check
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5173/api/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:5173/api/health
+
+      - name: Docker API Smoke
+        run: |
+          curl -fsS -X POST http://127.0.0.1:5173/api/tasks \
+            -H "Content-Type: application/json" \
+            -d '{"title":"docker-ci-task"}'
+
+      - name: Docker Compose Logs On Failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Docker Compose Down
+        if: always()
+        run: docker compose down --remove-orphans

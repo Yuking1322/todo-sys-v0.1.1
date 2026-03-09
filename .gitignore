@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+data/todos.json
+node_modules/
+.server.pid
+.run.log
+npm-debug.log*
+yarn-error.log*
+CODEX_PROGRESS.md
